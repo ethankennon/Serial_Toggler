@@ -24,11 +24,15 @@ import com.example.serialtoggler.ui.SerialTogglerViewModel
 import com.example.serialtoggler.ui.theme.SerialTogglerTheme
 
 class MainActivity : ComponentActivity() {
+
+	private lateinit var serialTogglerViewModel: SerialTogglerViewModel
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
-		val serialTogglerViewModel = SerialTogglerViewModel(applicationContext)
+		serialTogglerViewModel = SerialTogglerViewModel(applicationContext)
 
+		serialTogglerViewModel.registerUsbReceiver(applicationContext)
 
 		enableEdgeToEdge()
 		setContent {
@@ -41,6 +45,11 @@ class MainActivity : ComponentActivity() {
 				}
 			}
 		}
+	}
+
+	override fun onDestroy() {
+		super.onDestroy()
+		serialTogglerViewModel.unregisterUsbReceiver(applicationContext)
 	}
 }
 
@@ -72,13 +81,29 @@ fun SerialTogglerApp(
 	){
 		composable(route = SerialTogglerScreen.Connect.name) {
 			SerialDeviceSelectScreen(
+				availableDevices = viewModel.availableDrivers,
+				status = uiState.serialStatusMessage,
+				deviceConnected = uiState.serialDeviceConnected,
+				searchClicked = { viewModel.findDevices() },
+				connectClicked = {
+					viewModel.connectToDevice(it)
+					//navController.navigate(SerialTogglerScreen.Communicate.name)
+				},
+
 				nextScreen = { navController.navigate(SerialTogglerScreen.Communicate.name) },
 				modifier = modifier,
 			)
 		}
 		composable(route = SerialTogglerScreen.Communicate.name) {
 			SerialCommunicationScreen(
-				reconnectScreen = { navController.navigate(SerialTogglerScreen.Connect.name) },
+				status = uiState.serialStatusMessage,
+				receivedMessage = uiState.serialMessageReceived,
+				responseTime = uiState.serialResponseTime,
+				sendCommand = { viewModel.sendCommand(it) },
+				disconnectClicked = {
+					viewModel.disconnectDevice()
+					navController.navigate(SerialTogglerScreen.Connect.name)
+				},
 				modifier = modifier,
 			)
 		}
