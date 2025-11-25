@@ -23,7 +23,7 @@ import java.io.IOException
 import kotlin.system.measureNanoTime
 
 
-class SerialTogglerViewModel(context: Context) : SerialInputOutputManager.Listener {
+class SerialTogglerViewModel(context: Context) {
 	private val _serialUiState = MutableStateFlow(SerialUiState())
 	val serialUiState: StateFlow<SerialUiState> = _serialUiState.asStateFlow()
 
@@ -138,7 +138,16 @@ class SerialTogglerViewModel(context: Context) : SerialInputOutputManager.Listen
 			port?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
 			updateSerialStatusMessage("Connected to ${serialDevice.device.deviceName}")
 			updateSerialDeviceConnected(true)
-			usbIoManager = SerialInputOutputManager(port, this)
+			usbIoManager = SerialInputOutputManager(port, object : SerialInputOutputManager.Listener {
+				override fun onNewData(data: ByteArray) {
+					updateSerialMessageReceived(String(data))
+					stop = System.nanoTime()
+					updateSerialResponseTime(stop - start)
+				}
+				override fun onRunError(e: Exception) { //this is probably way too generous but I don't know what I'm catching with this - catches serial port being closed
+					updateSerialStatusMessage("Error: ${e.message}")
+				}
+			})
 			usbIoManager.start()
 		} catch (e: IOException) {
 			updateSerialStatusMessage("Error opening port: ${e.message}")
@@ -166,13 +175,4 @@ class SerialTogglerViewModel(context: Context) : SerialInputOutputManager.Listen
 		}
 	}
 
-	override fun onNewData(data: ByteArray) {
-		updateSerialMessageReceived(String(data))
-		stop = System.nanoTime()
-		updateSerialResponseTime(stop - start)
-	}
-
-	override fun onRunError(e: Exception) { //this is probably way too generous but I don't know what I'm catching with this - catches serial port being closed
-		updateSerialStatusMessage("Error: ${e.message}")
-	}
 }
